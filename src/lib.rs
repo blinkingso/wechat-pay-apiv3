@@ -9,6 +9,7 @@ pub(crate) mod verify;
 
 pub mod client;
 pub mod notification;
+pub mod error;
 
 pub mod prelude {
     // crate use
