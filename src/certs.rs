@@ -137,7 +137,10 @@ mod certs_manager {
 
     fn download_certificate() {
         use reqwest::blocking::{Client, ClientBuilder};
-        use reqwest::{header::{ACCEPT, USER_AGENT}, Method};
+        use reqwest::{
+            header::{ACCEPT, USER_AGENT},
+            Method,
+        };
         // ClientBuilder::default().proxy(proxy)
         let client = Client::new();
         let request = client

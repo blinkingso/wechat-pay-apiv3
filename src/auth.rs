@@ -3,10 +3,13 @@
 use std::io::Bytes;
 use std::time::{Duration, SystemTime};
 
+use reqwest::Url;
+use security::util::random_string;
+
 use crate::constant::headers::*;
 use crate::http::HttpHeaders;
 use crate::prelude::*;
-use crate::verify::Verifier;
+use crate::verify::{Verifier, CertificatesVerifier};
 
 pub mod signer {
 
@@ -47,13 +50,14 @@ pub mod signer {
 }
 pub trait Signer {
     /// Generate sign result str
-    fn sign(&self, message: impl AsRef<str>);
+    fn sign(&self, message: impl AsRef<str>) -> Result<SignatureResult, String>;
 
     /// Get signature algorithm
     fn get_algorithm(&self) -> &str;
 }
 
-pub struct RsaSigner(Bytes<u8>);
+/// `#PKCS8` private key
+pub struct RsaSigner(Vec<u8>);
 impl RsaSigner {
     const ALGORITHM: &str = "SHA256-RSA2048";
 }
@@ -62,14 +66,14 @@ impl Signer for RsaSigner {
         Self::ALGORITHM
     }
 
-    fn sign(&self, message: impl AsRef<str>) {
+    fn sign(&self, message: impl AsRef<str>) -> Result<SignatureResult, String> {
         todo!()
     }
 }
 
 pub trait Credential {
     /// Get auth type
-    fn get_schema(&self) -> &str;
+    fn get_schema(&self) -> String;
 
     /// Get merchant id
     fn get_merchant_id(&self) -> &str;
@@ -92,15 +96,17 @@ pub trait Validator {
         &self,
         body: impl AsRef<str>,
         headers: HttpHeaders,
-        verifier: impl Verifier,
     ) -> Result<(), Self::Error>;
 }
 use std::time::UNIX_EPOCH;
 
-pub struct WxPayValidator;
-pub struct WxPayCredential;
+use self::signer::SignatureResult;
+
+pub struct WxPay2Validator(CertificatesVerifier);
+pub type MerchantId = String;
+pub struct WxPay2Credential(MerchantId, RsaSigner);
 const RESPONSE_EXPIRED_SECONDS: u64 = 5 * 60;
-impl Validator for WxPayValidator {
+impl Validator for WxPay2Validator {
     type Response = ();
     type Error = String;
 
@@ -108,7 +114,6 @@ impl Validator for WxPayValidator {
         &self,
         body: impl AsRef<str>,
         headers: HttpHeaders,
-        verifier: impl Verifier,
     ) -> Result<(), Self::Error> {
         // CHECK TIMESTAMP
         let timestamp = headers
@@ -140,20 +145,51 @@ impl Validator for WxPayValidator {
         let signature = headers
             .get(WECHAT_PAY_SIGNATURE)
             .ok_or(format!("missing http header {}", WECHAT_PAY_SIGNATURE))?;
-        verifier.verify(serial_number, message, signature)
+        self.0.verify(serial_number, message, signature)
     }
 }
 
-const NONCE_LENGTH: i32 = 32;
+const NONCE_LENGTH: usize = 32;
 const SCHEMA_PREFIX: &str = "WECHATPAY2-";
+impl WxPay2Credential {
+    fn get_token(&self, uri: &str, http_method: &str, sign_body: &str) -> String {
+        let nonce_str = random_string(NONCE_LENGTH);
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let url = uri.parse::<Url>().unwrap();
+        let mut canonical_url = url.path().to_string();
+        if let Some(query) = url.query() {
+            canonical_url.push('?');
+            canonical_url.push_str(query);
+        }
+        let message = format!(
+            "{}\n{}\n{}\n{}\n{}\n",
+            http_method, canonical_url, timestamp, nonce_str, sign_body
+        );
+        debug!("authorization message[{}]", message);
+        let signature_result = self.1.sign(message).unwrap();
+        let token = format!(
+            "mchid=\"{}\",nonce_str=\"{}\",timestamp=\"{}\",searial_no=\"{}\",signature=\"{}\"",
+            self.get_merchant_id(),
+            nonce_str,
+            timestamp,
+            signature_result.get_serial_number(),
+            signature_result.get_sign()
+        );
+        debug!("The generated request signature information is[{}]", token);
 
-impl Credential for WxPayCredential {
-    fn get_schema(&self) -> &str {
-        todo!()
+        token
+    }
+}
+impl Credential for WxPay2Credential {
+    fn get_schema(&self) -> String {
+        format!("{}{}", SCHEMA_PREFIX, self.1.get_algorithm())
     }
 
     fn get_merchant_id(&self) -> &str {
-        todo!()
+        self.0.as_str()
     }
 
     fn get_authorization(
@@ -162,7 +198,11 @@ impl Credential for WxPayCredential {
         method: impl AsRef<str>,
         sign: impl AsRef<str>,
     ) -> String {
-        todo!()
+        format!(
+            "{} {}",
+            self.get_schema(),
+            self.get_token(uri.as_ref(), method.as_ref(), sign.as_ref())
+        )
     }
 }
 
