@@ -1,0 +1,53 @@
+[package]
+name = "securiy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.17"
+anyhow = "1.0.65"
+rand = "0.8.5"
+
+[dependencies.aes-gcm]
+version = "0.10.1"
+optional = true
+
+[dependencies.rsa]
+version = "0.6.1"
+optional = true
+
+[dependencies.base64]
+version = "0.13.0"
+optional = true
+
+[dependencies.x509-parser]
+version = "0.14.0"
+optional = true
+
+[dependencies.sha2]
+version = "0.10.6"
+optional = true
+
+[dependencies.md5]
+version = "0.7.0"
+optional = true
+
+[dependencies.sha1]
+version = "0.10.5"
+optional = true
+
+[dev-dependencies]
+pem = "1.1.0"
+pretty_env_logger = "0.4.0"
+
+[features]
+default = ["base64", "__aes"]
+__md5 = ["md5"]
+__sha1 = ["sha1"]
+__sha2 = ["sha2"]
+__hash = ["__sha2"]
+__rsa = ["rsa", "x509-parser", "rsa/pem"]
+__aes = ["aes-gcm", "aes-gcm/heapless"]
+
+# full feature contains
+full = ["__md5", "__sha1", "__sha2", "__rsa", "__aes"]
