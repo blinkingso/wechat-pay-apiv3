@@ -2,10 +2,13 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use reqwest::{header::HeaderMap, ClientBuilder};
+use reqwest::{header::HeaderMap, Certificate, ClientBuilder};
 use serde::{Deserialize, Serialize};
 
-use crate::cons::get_user_agent;
+use crate::{
+    auth::{WxPay2Credential, WxPay2Validator},
+    cons::get_user_agent,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct HttpHeaders(HashMap<String, String>);
@@ -97,8 +100,22 @@ impl std::fmt::Display for HostName {
 }
 
 /// Build a http client to execute http request.
-pub fn build_http_client(connect_timeout: u64, timeout: u64) -> reqwest::Client {
+pub fn build_async_http_client(connect_timeout: u64, timeout: u64) -> reqwest::Client {
+    let root_certificate = Certificate::from_pem(&[]).unwrap();
     ClientBuilder::default()
+        .connect_timeout(Duration::from_millis(connect_timeout))
+        .timeout(Duration::from_millis(timeout))
+        .https_only(true)
+        .user_agent(get_user_agent())
+        .add_root_certificate(root_certificate)
+        .http09_responses()
+        .build()
+        .unwrap()
+}
+
+#[cfg(feature = "blocking")]
+pub fn build_blocking_http_client(connect_timeout: u64, timeout: u64) -> reqwest::blocking::Client {
+    reqwest::blocking::ClientBuilder::default()
         .connect_timeout(Duration::from_millis(connect_timeout))
         .timeout(Duration::from_millis(timeout))
         .https_only(true)
@@ -107,7 +124,7 @@ pub fn build_http_client(connect_timeout: u64, timeout: u64) -> reqwest::Client 
         .unwrap()
 }
 
-pub struct DefaultHttpClient;
+pub struct DefaultHttpClient(WxPay2Credential, WxPay2Validator);
 
 #[async_trait]
 pub trait HttpClient {

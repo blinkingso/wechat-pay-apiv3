@@ -2,7 +2,7 @@ use crate::prelude::*;
 use aes_gcm::{aead::heapless::Vec, AeadInPlace, Aes256Gcm, KeyInit, Nonce};
 
 /// A function to execute aes-256 gcm alg
-pub(crate) fn decrypt(
+pub fn decrypt(
     key: impl AsRef<[u8]>,
     associated_data: impl AsRef<[u8]>,
     nonce: impl AsRef<[u8]>,
