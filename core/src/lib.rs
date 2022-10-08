@@ -6,7 +6,6 @@ pub mod header;
 pub mod http;
 pub mod notification;
 pub mod verify;
-pub(crate) mod aes;
 
 pub mod prelude {
     pub(crate) use crate::cipher::*;

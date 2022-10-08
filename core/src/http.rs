@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use reqwest::{header::HeaderMap, ClientBuilder};
 use serde::{Deserialize, Serialize};
 
@@ -106,21 +107,61 @@ pub fn build_http_client(connect_timeout: u64, timeout: u64) -> reqwest::Client 
         .unwrap()
 }
 
-pub struct HttpClient;
+pub struct DefaultHttpClient;
 
-#[cfg(feature = "blocking")]
-pub mod blocking {
-    use reqwest::blocking::{Client, ClientBuilder};
-    impl HttpClient {
-        pub fn post<T, R>(url: &str, body: &T) -> Result<R, Box<dyn std::error::Error>> {}
+#[async_trait]
+pub trait HttpClient {
+    type Error;
+    async fn post<T, R>(url: &str, body: &T) -> Result<R, Self::Error>
+    where
+        T: Serialize + Send + Sync,
+        R: Deserialize<'static>;
+    async fn get<R>(url: &str) -> Result<R, Self::Error>
+    where
+        R: Deserialize<'static>;
+
+    #[cfg(feature = "blocking")]
+    fn post_blocking<T, R>(url: &str, body: &T) -> Result<R, Self::Error>
+    where
+        T: Serialize,
+        R: Deserialize<'static>;
+    #[cfg(feature = "blocking")]
+    fn get_blocking<R>(url: &str) -> Result<R, Self::Error>
+    where
+        R: Deserialize<'static>;
+}
+
+#[async_trait]
+impl HttpClient for DefaultHttpClient {
+    type Error = Box<dyn std::error::Error>;
+
+    async fn post<T, R>(url: &str, body: &T) -> Result<R, Self::Error>
+    where
+        T: Serialize + Send + Sync,
+        R: Deserialize<'static>,
+    {
+        todo!()
+    }
+    async fn get<R>(url: &str) -> Result<R, Self::Error>
+    where
+        R: Deserialize<'static>,
+    {
+        todo!()
+    }
+
+    #[cfg(feature = "blocking")]
+    fn post_blocking<T, R>(url: &str, body: &T) -> Result<R, Self::Error>
+    where
+        T: Serialize,
+        R: Deserialize<'static>,
+    {
+        todo!()
+    }
+    #[cfg(feature = "blocking")]
+    fn get_blocking<R>(url: &str) -> Result<R, Self::Error>
+    where
+        R: Deserialize<'static>,
+    {
+        todo!()
     }
 }
-
-pub async fn post<T, R>(url: &str)
-where
-    T: Serialize,
-    R: Deserialize<'static>,
-{
-}
-
-pub async fn get(url: &str) {}
